@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Council</title>
+    <link rel="stylesheet" href="/static/styles.css?v=10">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
+</head>
+<body class="v2-page">
+    <div class="app">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="logo">🏛️</span>
+                <h1>Agent Council</h1>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Councils</div>
+                <div id="council-list" class="council-list"></div>
+            </div>
+            <div class="connection-status" id="connection-status">
+                <div class="dot disconnected" id="connection-dot"></div>
+                <span>Connecting...</span>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="chat-header">
+                <div>
+                    <div class="council-name" id="council-name">General Council</div>
+                    <div class="council-info" id="council-info"><span>debate</span><span>•</span><span>3 agents</span></div>
+                </div>
+            </div>
+
+            <div class="chat-messages" id="chat-messages">
+                <div class="welcome" id="welcome">
+                    <div class="logo-large">🏛️</div>
+                    <h2>Agent Council</h2>
+                    <p>All agent and moderator outputs are shown in sequence. Scroll the full page to review everything.</p>
+                </div>
+            </div>
+
+            <div class="chat-input-container">
+                <div class="chat-input-wrapper">
+                    <textarea id="chat-input" class="chat-input" rows="1" placeholder="Ask the council anything..."></textarea>
+                    <button id="send-btn" class="send-btn" onclick="sendTask()">➤</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/app.js?v=10"></script>
+</body>
+</html>

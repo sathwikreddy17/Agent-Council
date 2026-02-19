@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Agent Council — UI Test</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        .test-controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 9999;
+            background: #1e1e2e;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .test-controls button {
+            padding: 8px 16px;
+            background: #58a6ff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .test-controls button:hover { background: #79c0ff; }
+        #test-log {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            z-index: 9999;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            font-family: monospace;
+            font-size: 11px;
+            max-height: 200px;
+            overflow-y: auto;
+            width: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <main class="main" style="margin-left: 0; width: 100%;">
+            <div class="chat-header">
+                <div>
+                    <div class="council-name">UI Test Page</div>
+                    <div class="council-info"><span>Testing event rendering</span></div>
+                </div>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <div class="welcome" id="welcome">
+                    <div class="logo-large">🧪</div>
+                    <h2>UI Rendering Test</h2>
+                    <p>Click a test button to inject events and verify cards render correctly.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="test-controls">
+        <strong style="color: #c9d1d9;">🧪 Test Controls</strong>
+        <button onclick="runLocalTest()">Test 1: Local Events</button>
+        <button onclick="runWSTest()">Test 2: WebSocket Events</button>
+        <button onclick="clearChat()">Clear Chat</button>
+    </div>
+    <div id="test-log"></div>
+
+    <script>
+        // Minimal state (copied from app.js)
+        const state = {
+            ws: null,
+            currentCard: null,
+            currentBody: null,
+            agentColors: {},
+            nextColorIndex: 1,
+            models: {},
+            isRunning: false,
+        };
+
+        function log(msg) {
+            const el = document.getElementById('test-log');
+            el.textContent += msg + '\n';
+            el.scrollTop = el.scrollHeight;
+            console.log(msg);
+        }
+
+        // Load models from config
+        fetch('/api/config').then(r => r.json()).then(config => {
+            state.models = config.models;
+            log('✅ Loaded ' + Object.keys(config.models).length + ' models');
+        }).catch(e => log('❌ Config load failed: ' + e));
+
+        // === Core rendering functions (copied from app.js) ===
+
+        function getAgentColorIndex(agentRole) {
+            if (!state.agentColors[agentRole]) {
+                state.agentColors[agentRole] = state.nextColorIndex;
+                state.nextColorIndex = (state.nextColorIndex % 5) + 1;
+            }
+            return state.agentColors[agentRole];
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function scrollToBottom() {
+            const messages = document.getElementById('chat-messages');
+            requestAnimationFrame(() => { messages.scrollTop = messages.scrollHeight; });
+        }
+
+        function appendStatus(text) {
+            const messages = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = 'status-message';
+            div.innerHTML = `<div class="spinner"></div> ${escapeHtml(text)}`;
+            messages.appendChild(div);
+            scrollToBottom();
+        }
+
+        function appendRoundSeparator(round, totalRounds) {
+            const messages = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = 'round-separator';
+            div.textContent = totalRounds ? `Round ${round} of ${totalRounds}` : `Step ${round}`;
+            messages.appendChild(div);
+            scrollToBottom();
+        }
+
+        function startAgentCard(agentRole, round, modelKey, isModerator) {
+            log('>>> startAgentCard(' + agentRole + ', ' + round + ', ' + modelKey + ', ' + isModerator + ')');
+            const messages = document.getElementById('chat-messages');
+            const colorIndex = isModerator ? 0 : getAgentColorIndex(agentRole);
+
+            const card = document.createElement('div');
+            card.className = `agent-card streaming ${isModerator ? 'moderator' : `agent-color-${colorIndex}`}`;
+
+            const initials = agentRole.split(' ').map(w => w[0]).join('').substring(0, 2);
+            const modelName = state.models[modelKey]?.name || modelKey || '';
+
+            const avatarColors = ['var(--moderator)', 'var(--agent-1)', 'var(--agent-2)', 'var(--agent-3)', 'var(--agent-4)', 'var(--agent-5)'];
+            const avatarBg = avatarColors[colorIndex] || 'var(--agent-1)';
+
+            card.innerHTML = `
+                <div class="agent-card-header">
+                    <div class="agent-avatar" style="background-color: ${avatarBg}">${isModerator ? '⚖️' : initials}</div>
+                    <span class="agent-name">${escapeHtml(agentRole)}</span>
+                    ${modelName ? `<span class="agent-model">${escapeHtml(modelName)}</span>` : ''}
+                </div>
+                <div class="agent-card-body">
+                    <div class="typing-indicator"><span></span><span></span><span></span></div>
+                </div>
+            `;
+
+            messages.appendChild(card);
+            state.currentCard = card;
+            state.currentBody = card.querySelector('.agent-card-body');
+            log('>>> Card created, currentBody=' + (state.currentBody ? 'OK' : 'NULL'));
+            scrollToBottom();
+        }
+
+        function appendChunk(text) {
+            if (!state.currentBody) {
+                log('⚠️ appendChunk but no currentBody!');
+                return;
+            }
+            if (!text) return;
+            const indicator = state.currentBody.querySelector('.typing-indicator');
+            if (indicator) indicator.remove();
+            state.currentBody.textContent += text;
+            scrollToBottom();
+        }
+
+        function finishCurrentCard() {
+            if (state.currentCard) {
+                state.currentCard.classList.remove('streaming');
+                const indicator = state.currentBody?.querySelector('.typing-indicator');
+                if (indicator) indicator.remove();
+            }
+            state.currentCard = null;
+            state.currentBody = null;
+        }
+
+        function updateModelDot() {} // no-op for test
+
+        function handleEvent(event) {
+            log('Event: ' + event.type + ' agent=' + (event.agent || '') + ' content_len=' + (event.content?.length || 0));
+            switch (event.type) {
+                case 'status': appendStatus(event.content); break;
+                case 'round_start': appendRoundSeparator(event.round, event.metadata?.total_rounds); break;
+                case 'model_loading': appendStatus('Loading model for ' + event.agent + '...'); break;
+                case 'model_loaded': break;
+                case 'agent_start':
+                    finishCurrentCard();
+                    startAgentCard(event.agent, event.round, event.metadata?.model, false);
+                    break;
+                case 'agent_chunk':
+                    if (!state.currentBody) {
+                        log('⚠️ Chunk without card, creating one');
+                        startAgentCard(event.agent || 'Agent', event.round || 0, '', false);
+                    }
+                    appendChunk(event.content);
+                    break;
+                case 'agent_done': finishCurrentCard(); break;
+                case 'moderator_start':
+                    finishCurrentCard();
+                    startAgentCard('Moderator', 0, '', true);
+                    break;
+                case 'moderator_chunk':
+                    if (!state.currentBody) startAgentCard('Moderator', 0, '', true);
+                    appendChunk(event.content);
+                    break;
+                case 'moderator_done': finishCurrentCard(); break;
+                case 'round_done': finishCurrentCard(); break;
+                case 'council_done':
+                    finishCurrentCard();
+                    appendStatus('✅ Council session complete');
+                    break;
+                default: log('Unknown event: ' + event.type);
+            }
+        }
+
+        // === Test functions ===
+
+        function clearChat() {
+            const messages = document.getElementById('chat-messages');
+            messages.innerHTML = '';
+            state.currentCard = null;
+            state.currentBody = null;
+            state.agentColors = {};
+            state.nextColorIndex = 1;
+            document.getElementById('test-log').textContent = '';
+            log('Chat cleared');
+        }
+
+        function runLocalTest() {
+            log('=== LOCAL TEST START ===');
+            document.getElementById('welcome').style.display = 'none';
+            state.agentColors = {};
+            state.nextColorIndex = 1;
+
+            const events = [
+                { type: 'status', agent: '', content: 'Starting Test (debate)', metadata: {} },
+                { type: 'round_start', agent: '', round: 1, content: '', metadata: { total_rounds: 1 } },
+                { type: 'model_loading', agent: 'Analyst', round: 0, content: '', metadata: { model: 'phi4-mini' } },
+                { type: 'model_loaded', agent: 'Analyst', round: 0, content: '', metadata: { model: 'phi4-mini' } },
+                { type: 'agent_start', agent: 'Analyst', round: 1, content: '', metadata: { model: 'phi4-mini' } },
+                { type: 'agent_chunk', agent: 'Analyst', round: 1, content: 'This is the Analyst speaking. ', metadata: {} },
+                { type: 'agent_chunk', agent: 'Analyst', round: 1, content: 'The three body problem is fascinating. ', metadata: {} },
+                { type: 'agent_chunk', agent: 'Analyst', round: 1, content: 'Here is my analysis...', metadata: {} },
+                { type: 'agent_done', agent: 'Analyst', round: 1, content: '', metadata: {} },
+                { type: 'agent_start', agent: 'Creative Thinker', round: 1, content: '', metadata: { model: 'llama-3b' } },
+                { type: 'agent_chunk', agent: 'Creative Thinker', round: 1, content: 'I think we should consider the poetic aspects too!', metadata: {} },
+                { type: 'agent_done', agent: 'Creative Thinker', round: 1, content: '', metadata: {} },
+                { type: 'round_done', agent: '', round: 1, content: '', metadata: {} },
+                { type: 'moderator_start', agent: 'Moderator', round: 0, content: '', metadata: {} },
+                { type: 'moderator_chunk', agent: 'Moderator', round: 0, content: 'After reviewing both perspectives, ', metadata: {} },
+                { type: 'moderator_chunk', agent: 'Moderator', round: 0, content: 'here is the synthesized answer.', metadata: {} },
+                { type: 'moderator_done', agent: 'Moderator', round: 0, content: '', metadata: {} },
+                { type: 'council_done', agent: '', round: 0, content: 'Done', metadata: {} },
+            ];
+
+            events.forEach((evt, i) => {
+                setTimeout(() => {
+                    try {
+                        handleEvent(evt);
+                    } catch (e) {
+                        log('❌ ERROR at event ' + i + ' (' + evt.type + '): ' + e.message);
+                        console.error(e);
+                    }
+                }, i * 150);
+            });
+        }
+
+        function runWSTest() {
+            log('=== WEBSOCKET TEST START ===');
+            document.getElementById('welcome').style.display = 'none';
+            state.agentColors = {};
+            state.nextColorIndex = 1;
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(protocol + '//' + window.location.host + '/ws/test');
+
+            ws.onopen = () => {
+                log('WS connected, sending trigger');
+                ws.send(JSON.stringify({ type: 'test' }));
+            };
+
+            ws.onmessage = (event) => {
+                let data;
+                try { data = JSON.parse(event.data); } catch (e) {
+                    log('❌ Parse error: ' + e);
+                    return;
+                }
+                try {
+                    handleEvent(data);
+                } catch (e) {
+                    log('❌ handleEvent error: ' + e.message);
+                    console.error(e);
+                }
+            };
+
+            ws.onclose = () => log('WS disconnected');
+            ws.onerror = (e) => log('WS error: ' + e);
+        }
+    </script>
+</body>
+</html>
