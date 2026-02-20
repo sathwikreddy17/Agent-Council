@@ -309,12 +309,45 @@ async def health_check():
     Health check endpoint.
 
     Returns:
-        Server status and LM Studio connectivity info.
+        Server status, LM Studio connectivity, and real system metrics.
     """
+    import psutil
+
     lm_status = await engine.check_lm_studio()
+
+    # Real CPU & RAM metrics
+    cpu_pct  = psutil.cpu_percent(interval=None)
+    ram      = psutil.virtual_memory()
+    ram_pct  = ram.percent
+
+    # GPU / VRAM via LM Studio models endpoint (best-effort)
+    gpu_pct  = None
+    vram_pct = None
+    try:
+        import httpx
+        r = await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: httpx.get("http://localhost:1234/v1/system/stats", timeout=1.0)
+            ),
+            timeout=1.5
+        )
+        if r.status_code == 200:
+            s = r.json()
+            gpu_pct  = s.get("gpu_usage")
+            vram_pct = s.get("vram_usage")
+    except Exception:
+        pass
+
     return {
         "status": "ok",
         "lm_studio": lm_status,
+        "system": {
+            "cpu":  round(cpu_pct, 1),
+            "ram":  round(ram_pct, 1),
+            "gpu":  gpu_pct,
+            "vram": vram_pct,
+        },
     }
 
 

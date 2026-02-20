@@ -1,54 +1,227 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agent Council</title>
-    <link rel="stylesheet" href="/static/styles.css?v=10">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Council</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v=52">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
 </head>
-<body class="v2-page">
-    <div class="app">
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <span class="logo">🏛️</span>
-                <h1>Agent Council</h1>
+<body>
+
+  <!-- ── Background layers ── -->
+  <div class="bg-fixed" aria-hidden="true">
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+    <div class="bg-dots"></div>
+  </div>
+
+  <div class="layout">
+
+    <!-- ════════════════════════════════════
+         SIDEBAR
+         ════════════════════════════════════ -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-mark">🏛️</div>
+        <div>
+          <div class="sidebar-logo-title">Agent Council</div>
+          <div class="sidebar-logo-sub">Local inference chamber</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section-label">COUNCILS</div>
+      <div id="council-list" class="council-list"></div>
+
+      <div class="sidebar-footer">
+        <button class="icon-btn" onclick="clearChat()" title="Clear conversation">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+          <span>New Session</span>
+        </button>
+        <div class="conn-row" id="connection-status">
+          <div class="conn-indicator">
+            <div class="dot disconnected" id="connection-dot"></div>
+            <div class="dot-ring" id="connection-ring"></div>
+          </div>
+          <span id="conn-label">Connecting…</span>
+          <span class="pill">Local</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ════════════════════════════════════
+         MAIN
+         ════════════════════════════════════ -->
+    <main class="main">
+
+      <!-- Top bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <span class="topbar-title" id="council-name">General Council</span>
+          <div id="council-info" class="topbar-badges">
+            <span class="pill pill-cyan">DEBATE</span>
+            <span class="pill pill-violet">3 MODELS</span>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <div class="session-timer" id="session-timer"></div>
+        </div>
+      </header>
+
+      <!-- Content grid: feed + right rail -->
+      <div class="content-grid">
+
+        <!-- ── Feed column ── -->
+        <section class="feed-col">
+
+          <!-- System HUD -->
+          <div class="glass-panel hud-panel" id="system-hud">
+            <div class="hud-header">
+              <div>
+                <div class="panel-title">System HUD</div>
+                <div class="panel-sub">Live local utilization</div>
+              </div>
+              <span class="pill" id="hud-tps">— t/s</span>
             </div>
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">Councils</div>
-                <div id="council-list" class="council-list"></div>
+            <div class="gauges">
+              <div class="gauge-row">
+                <span class="gauge-label">CPU</span>
+                <div class="gauge-bar"><div class="gauge-fill" id="g-cpu" style="width:0%"></div></div>
+                <span class="gauge-val" id="v-cpu">—</span>
+              </div>
+              <div class="gauge-row">
+                <span class="gauge-label">GPU</span>
+                <div class="gauge-bar"><div class="gauge-fill" id="g-gpu" style="width:0%"></div></div>
+                <span class="gauge-val" id="v-gpu">—</span>
+              </div>
+              <div class="gauge-row">
+                <span class="gauge-label">VRAM</span>
+                <div class="gauge-bar"><div class="gauge-fill" id="g-vram" style="width:0%"></div></div>
+                <span class="gauge-val" id="v-vram">—</span>
+              </div>
+              <div class="gauge-row">
+                <span class="gauge-label">RAM</span>
+                <div class="gauge-bar"><div class="gauge-fill" id="g-ram" style="width:0%"></div></div>
+                <span class="gauge-val" id="v-ram">—</span>
+              </div>
             </div>
-            <div class="connection-status" id="connection-status">
-                <div class="dot disconnected" id="connection-dot"></div>
-                <span>Connecting...</span>
+          </div>
+
+          <!-- Chat messages -->
+          <div class="chat-messages" id="chat-messages">
+            <div class="welcome" id="welcome">
+              <div class="welcome-eyebrow">AGENT COUNCIL</div>
+              <div class="welcome-logo">🏛️</div>
+              <h2 class="welcome-title">The Intelligence Chamber</h2>
+              <p class="welcome-sub">Orchestrate local models — debate, compare, and synthesize higher-quality answers.</p>
+              <div class="welcome-examples" id="example-prompts">
+                <button class="example-btn" onclick="fillPrompt(this)">Explain quantum computing simply</button>
+                <button class="example-btn" onclick="fillPrompt(this)">Review this architecture decision</button>
+                <button class="example-btn" onclick="fillPrompt(this)">Compare React vs Vue vs Svelte</button>
+                <button class="example-btn" onclick="fillPrompt(this)">Debug a race condition</button>
+              </div>
             </div>
+          </div>
+
+          <!-- Prompt console -->
+          <div class="prompt-console glass-panel">
+            <div class="console-toprow">
+              <div class="console-pills">
+                <span class="pill" id="pill-strategy">Compare</span>
+                <span class="pill">Temp 0.4</span>
+                <span class="pill">Top-p 0.9</span>
+                <span class="pill">Max 1200</span>
+              </div>
+              <div class="console-actions">
+                <button class="primary-btn" id="send-btn" onclick="sendTask()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  </svg>
+                  Run
+                </button>
+              </div>
+            </div>
+            <textarea id="chat-input" class="console-input" rows="1" placeholder="Ask the council anything…"></textarea>
+            <div class="console-hint">
+              <span>Enter to run · Shift+Enter for new line</span>
+              <span>Local inference · No cloud calls</span>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- ── Right rail ── -->
+        <aside class="right-rail">
+
+          <!-- Scoreboard -->
+          <div class="glass-panel" id="scoreboard-panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Scoreboard</div>
+                <div class="panel-sub">Rubric-weighted ranking</div>
+              </div>
+            </div>
+            <div class="score-list" id="score-list">
+              <div class="score-empty">Run a prompt to see rankings.</div>
+            </div>
+
+            <div class="rubric-section">
+              <div class="rubric-title">Rubric weights</div>
+              <div class="rubric-rows" id="rubric-rows">
+                <div class="rubric-row">
+                  <span>Accuracy</span>
+                  <input type="range" min="0" max="100" value="45" id="rubric-a" oninput="updateRubric()">
+                  <span class="rubric-val" id="rv-a">45</span>
+                </div>
+                <div class="rubric-row">
+                  <span>Completeness</span>
+                  <input type="range" min="0" max="100" value="25" id="rubric-c" oninput="updateRubric()">
+                  <span class="rubric-val" id="rv-c">25</span>
+                </div>
+                <div class="rubric-row">
+                  <span>Conciseness</span>
+                  <input type="range" min="0" max="100" value="15" id="rubric-k" oninput="updateRubric()">
+                  <span class="rubric-val" id="rv-k">15</span>
+                </div>
+                <div class="rubric-row">
+                  <span>Tone match</span>
+                  <input type="range" min="0" max="100" value="15" id="rubric-t" oninput="updateRubric()">
+                  <span class="rubric-val" id="rv-t">15</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Session panel -->
+          <div class="glass-panel session-panel">
+            <div class="panel-title">Session</div>
+            <div class="panel-sub" style="margin-bottom:12px">Snapshots, exports, and reproducible runs.</div>
+            <div class="session-cards">
+              <div class="session-card">
+                <div class="session-card-title">Preset</div>
+                <div class="session-card-sub">Debate · Technical · Low hallucination</div>
+              </div>
+              <div class="session-card">
+                <div class="session-card-title">Context</div>
+                <div class="session-card-sub">Drag files into prompt area (future) · RAG toggle</div>
+              </div>
+              <div class="session-card">
+                <div class="session-card-title">Reproducibility</div>
+                <div class="session-card-sub">Save model versions, seeds, and rubric weights per run.</div>
+              </div>
+            </div>
+          </div>
+
         </aside>
+      </div>
+    </main>
+  </div>
 
-        <main class="main">
-            <div class="chat-header">
-                <div>
-                    <div class="council-name" id="council-name">General Council</div>
-                    <div class="council-info" id="council-info"><span>debate</span><span>•</span><span>3 agents</span></div>
-                </div>
-            </div>
-
-            <div class="chat-messages" id="chat-messages">
-                <div class="welcome" id="welcome">
-                    <div class="logo-large">🏛️</div>
-                    <h2>Agent Council</h2>
-                    <p>All agent and moderator outputs are shown in sequence. Scroll the full page to review everything.</p>
-                </div>
-            </div>
-
-            <div class="chat-input-container">
-                <div class="chat-input-wrapper">
-                    <textarea id="chat-input" class="chat-input" rows="1" placeholder="Ask the council anything..."></textarea>
-                    <button id="send-btn" class="send-btn" onclick="sendTask()">➤</button>
-                </div>
-            </div>
-        </main>
-    </div>
-
-    <script src="/static/app.js?v=10"></script>
+  <script src="/static/app.js?v=52"></script>
 </body>
 </html>
